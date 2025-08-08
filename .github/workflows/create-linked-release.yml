@@ -1,0 +1,83 @@
+name: Create Linked Release from Upstream Repo
+
+on:
+  schedule:
+    # Runs 4 times a day (every 6 hours)
+    - cron: '0 */6 * * *'
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync-and-link-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get latest stable release from public upstream repo
+        id: get_release_b
+        uses: pozetroninc/github-action-get-latest-release@master
+        with:
+          # Reads the UPSTREAM_REPO variable from your repository settings.
+          # This variable is REQUIRED for the workflow to function.
+          repository: ${{ vars.UPSTREAM_REPO }}
+          excludes: prerelease, draft
+
+      - name: Validate Release Tag Format
+        id: validate_tag
+        env:
+          # Use the repo variable if it exists, otherwise use the hardcoded default regex.
+          VERSION_REGEX: ${{ vars.VERSION_REGEX || '^v?[0-9]+\.[0-9]+\.[0-9]+$' }}
+        run: |
+          TAG_NAME="${{ steps.get_release_b.outputs.tag }}"
+          if [[ -z "$TAG_NAME" ]]; then
+            echo "No valid release found from upstream repository. Exiting."
+            echo "is_valid=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "$TAG_NAME" =~ $VERSION_REGEX ]]; then
+            echo "Tag '$TAG_NAME' matches the required format."
+            echo "is_valid=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Tag '$TAG_NAME' does not match the required format. Ignoring."
+            echo "is_valid=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check if release tag already exists in this repository
+        id: check_release_a
+        if: steps.validate_tag.outputs.is_valid == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.get_release_b.outputs.tag }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release tag '$RELEASE_TAG' already exists. No action needed."
+            echo "new_release_detected=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New valid release tag '$RELEASE_TAG' detected!"
+            echo "new_release_detected=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create new linked release in this repository
+        if: steps.check_release_a.outputs.new_release_detected == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPSTREAM_REPO: ${{ vars.UPSTREAM_REPO }}
+          # Use the repo variable for the template if it exists, otherwise use the default.
+          # Note: We use \n for newlines to keep it a valid one-line expression.
+          NOTES_TEMPLATE: ${{ vars.RELEASE_NOTE_TEMPLATE || 'This release corresponds to the upstream release in the **{{RepositoryName}}** repository.\n\n**Original Release:** {{URL}}' }}
+          RELEASE_TAG: ${{ steps.get_release_b.outputs.tag }}
+          RELEASE_NAME: ${{ steps.get_release_b.outputs.name }}
+          RELEASE_URL: ${{ steps.get_release_b.outputs.html_url }}
+        run: |
+          REPO_NAME_ONLY=${UPSTREAM_REPO#*/}
+          NOTES_WITH_REPO_NAME="${NOTES_TEMPLATE//'{{RepositoryName}}'/$REPO_NAME_ONLY}"
+          FINAL_NOTES="${NOTES_WITH_REPO_NAME//'{{URL}}'/$RELEASE_URL}"
+
+          gh release create "$RELEASE_TAG" \
+            --title "$RELEASE_NAME" \
+            --notes "$FINAL_NOTES"
+
+          echo "Successfully created release '$RELEASE_NAME' with tag '$RELEASE_TAG'."
