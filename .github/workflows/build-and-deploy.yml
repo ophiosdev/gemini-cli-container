@@ -7,7 +7,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: gemini-cli
+  IMAGE_NAME: ophiosdev/gemini-cli
 
 jobs:
   build-and-push:
@@ -50,7 +50,7 @@ jobs:
             org.opencontainers.image.maintainer=Ophios GmbH
       - name: Build and push Docker image
         id: build_and_push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
