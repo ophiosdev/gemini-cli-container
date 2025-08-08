@@ -1,5 +1,7 @@
 FROM node:22-slim AS builder
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 ARG USERNAME=gemini
 ARG UID=1000
 ARG GID=1000
@@ -11,6 +13,7 @@ RUN sed -i "/^[^:]*:x:${GID}:/d" /etc/group \
     && echo "${USERNAME}:x:${GID}:" >> /etc/group \
     && mkdir -p /home/${USERNAME}
 
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     git \
