@@ -1,8 +1,6 @@
 # Gemini CLI Container<!-- omit from toc -->
 
 - [Container Architecture](#container-architecture)
-  - [Structure of `Dockerfile`](#structure-of-dockerfile)
-  - [Security Features](#security-features)
 - [Building the Container Image](#building-the-container-image)
   - [Build Arguments](#build-arguments)
 - [Authentication Setup](#authentication-setup)
@@ -30,26 +28,13 @@
   - [File Access Issues](#file-access-issues)
   - [Container Issues](#container-issues)
 
-A containerized version of Google's Gemini CLI tool, built with security and
-portability in mind. This container provides a rootless, distroless environment
-for running Gemini CLI commands while maintaining persistent authentication and
-seamless file access.
+A containerized version of Google's Gemini CLI tool. This container provides a rootless environment
+for running Gemini CLI commands while maintaining persistent authentication and seamless file access.
 
 ## Container Architecture
 
-### Structure of `Dockerfile`
-
-This container uses a multi-stage build process for optimal security and size:
-
-- **Stage 1 (Builder)**: Uses `node:20-slim` to install the `@google/gemini-cli` package
-- **Stage 2 (OS Prep)**: Uses `debian:stable-slim` to prepare user configuration files
-- **Final Stage**: Uses `gcr.io/distroless/nodejs20-debian12:nonroot` for a minimal, secure runtime
-
-### Security Features
-
 - **Rootless execution**: Runs as user `gemini` (UID 1000) instead of root
-- **Distroless base**: Minimal attack surface with no shell or package managers
-- **Non-privileged user**: Enhanced security through principle of least privilege
+- **Minimal base**: Uses `node:22-slim` which provides a smaller attack surface
 
 ## Building the Container Image
 
@@ -103,6 +88,7 @@ To verify your authentication is working:
 ```bash
 docker run -it -v $HOME:/home/gemini --rm gemini-cli:dev --help
 ```
+
 If authentication is successful, you should see the Gemini CLI help without authentication prompts.
 
 ### Authentication via GEMINI_API_KEY
