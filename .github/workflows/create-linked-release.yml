@@ -30,7 +30,7 @@ jobs:
           # Use the repo variable if it exists, otherwise use the hardcoded default regex.
           VERSION_REGEX: ${{ vars.VERSION_REGEX || '^v?[0-9]+\.[0-9]+\.[0-9]+$' }}
         run: |
-          TAG_NAME="${{ steps.get_release_b.outputs.tag }}"
+          TAG_NAME="${{ steps.get_release_b.outputs.release }}"
           if [[ -z "$TAG_NAME" ]]; then
             echo "No valid release found from upstream repository. Exiting."
             echo "is_valid=false" >> "$GITHUB_OUTPUT"
@@ -50,7 +50,7 @@ jobs:
         if: steps.validate_tag.outputs.is_valid == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ steps.get_release_b.outputs.tag }}
+          RELEASE_TAG: ${{ steps.get_release_b.outputs.release }}
         run: |
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             echo "Release tag '$RELEASE_TAG' already exists. No action needed."
@@ -68,16 +68,14 @@ jobs:
           # Use the repo variable for the template if it exists, otherwise use the default.
           # Note: We use \n for newlines to keep it a valid one-line expression.
           NOTES_TEMPLATE: ${{ vars.RELEASE_NOTE_TEMPLATE || 'This release corresponds to the upstream release in the **{{RepositoryName}}** repository.\n\n**Original Release:** {{URL}}' }}
-          RELEASE_TAG: ${{ steps.get_release_b.outputs.tag }}
-          RELEASE_NAME: ${{ steps.get_release_b.outputs.name }}
-          RELEASE_URL: ${{ steps.get_release_b.outputs.html_url }}
+          RELEASE_TAG: ${{ steps.get_release_b.outputs.release }}
+          RELEASE_URL: "https://github.com/${{ vars.UPSTREAM_REPO }}/releases/tag/${{ steps.get_release_b.outputs.html_url }}"
         run: |
           REPO_NAME_ONLY=${UPSTREAM_REPO#*/}
           NOTES_WITH_REPO_NAME="${NOTES_TEMPLATE//'{{RepositoryName}}'/$REPO_NAME_ONLY}"
           FINAL_NOTES="${NOTES_WITH_REPO_NAME//'{{URL}}'/$RELEASE_URL}"
 
           gh release create "$RELEASE_TAG" \
-            --title "$RELEASE_NAME" \
             --notes "$FINAL_NOTES"
 
-          echo "Successfully created release '$RELEASE_NAME' with tag '$RELEASE_TAG'."
+          echo "Successfully created release with tag '$RELEASE_TAG'."
