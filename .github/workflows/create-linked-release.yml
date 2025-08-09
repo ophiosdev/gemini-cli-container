@@ -25,6 +25,7 @@ jobs:
           # This variable is REQUIRED for the workflow to function.
           repository: ${{ vars.UPSTREAM_REPO }}
           excludes: prerelease, draft
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Validate Release Tag Format
         id: validate_tag
@@ -32,7 +33,9 @@ jobs:
           # Use the repo variable for the regex if it exists, otherwise use the default.
           VERSION_REGEX: ${{ vars.VERSION_REGEX || '^v?[0-9]+\.[0-9]+\.[0-9]+$' }}
         run: |
-          TAG_NAME="${{ steps.get_release_b.outputs.tag }}"
+          TAG_NAME="${{ steps.get_release_b.outputs.release }}"
+
+          echo "Validating release tag format for latest release from upstream repository: $TAG_NAME"
           if [[ -z "$TAG_NAME" ]]; then
             echo "No valid release found from upstream repository. Exiting."
             echo "is_valid=false" >> "$GITHUB_OUTPUT"
@@ -58,7 +61,7 @@ jobs:
         id: check_tag
         if: steps.validate_tag.outputs.is_valid == 'true'
         env:
-          RELEASE_TAG: ${{ steps.get_release_b.outputs.tag }}
+          RELEASE_TAG: ${{ steps.get_release_b.outputs.release }}
         run: |
           if git tag --list | grep -q "^${RELEASE_TAG}$"; then
             echo "Tag '$RELEASE_TAG' already exists. No action needed."
@@ -72,7 +75,7 @@ jobs:
         # This step only runs if the tag is valid AND new.
         if: steps.check_tag.outputs.create_tag == 'true'
         env:
-          RELEASE_TAG: ${{ steps.get_release_b.outputs.tag }}
+          RELEASE_TAG: ${{ steps.get_release_b.outputs.release }}
         run: |
           RELEASE_TAG="v${RELEASE_TAG#v}" # Ensure the tag starts with 'v'
 
