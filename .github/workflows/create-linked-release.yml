@@ -1,17 +1,19 @@
-name: Create Linked Release from Upstream Repo
+name: Create Linked Tag from Upstream Repo
 
 on:
   schedule:
     # Runs 4 times a day (every 6 hours)
     - cron: '0 */6 * * *'
 
+  # A simple manual trigger for testing.
   workflow_dispatch:
 
 permissions:
+  # 'contents: write' is required to push tags to the repository.
   contents: write
 
 jobs:
-  sync-and-link-release:
+  sync-tag:
     runs-on: ubuntu-latest
 
     steps:
@@ -27,10 +29,10 @@ jobs:
       - name: Validate Release Tag Format
         id: validate_tag
         env:
-          # Use the repo variable if it exists, otherwise use the hardcoded default regex.
+          # Use the repo variable for the regex if it exists, otherwise use the default.
           VERSION_REGEX: ${{ vars.VERSION_REGEX || '^v?[0-9]+\.[0-9]+\.[0-9]+$' }}
         run: |
-          TAG_NAME="${{ steps.get_release_b.outputs.release }}"
+          TAG_NAME="${{ steps.get_release_b.outputs.tag }}"
           if [[ -z "$TAG_NAME" ]]; then
             echo "No valid release found from upstream repository. Exiting."
             echo "is_valid=false" >> "$GITHUB_OUTPUT"
@@ -45,37 +47,39 @@ jobs:
             echo "is_valid=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Check if release tag already exists in this repository
-        id: check_release_a
+      - name: Checkout repository code
+        # We need to check out the code to be able to check for existing tags and push new ones.
+        if: steps.validate_tag.outputs.is_valid == 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+
+      - name: Check if tag already exists locally
+        id: check_tag
         if: steps.validate_tag.outputs.is_valid == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ steps.get_release_b.outputs.release }}
+          RELEASE_TAG: ${{ steps.get_release_b.outputs.tag }}
         run: |
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            echo "Release tag '$RELEASE_TAG' already exists. No action needed."
-            echo "new_release_detected=false" >> "$GITHUB_OUTPUT"
+          if git tag --list | grep -q "^${RELEASE_TAG}$"; then
+            echo "Tag '$RELEASE_TAG' already exists. No action needed."
+            echo "create_tag=false" >> "$GITHUB_OUTPUT"
           else
-            echo "New valid release tag '$RELEASE_TAG' detected!"
-            echo "new_release_detected=true" >> "$GITHUB_OUTPUT"
+            echo "New valid tag '$RELEASE_TAG' detected!"
+            echo "create_tag=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Create new linked release in this repository
-        if: steps.check_release_a.outputs.new_release_detected == 'true'
+      - name: Create and push new tag
+        # This step only runs if the tag is valid AND new.
+        if: steps.check_tag.outputs.create_tag == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          UPSTREAM_REPO: ${{ vars.UPSTREAM_REPO }}
-          # Use the repo variable for the template if it exists, otherwise use the default.
-          # Note: We use \n for newlines to keep it a valid one-line expression.
-          NOTES_TEMPLATE: ${{ vars.RELEASE_NOTE_TEMPLATE || 'This release corresponds to the upstream release in the **{{RepositoryName}}** repository.\n\n**Original Release:** {{URL}}' }}
-          RELEASE_TAG: ${{ steps.get_release_b.outputs.release }}
-          RELEASE_URL: "https://github.com/${{ vars.UPSTREAM_REPO }}/releases/tag/${{ steps.get_release_b.outputs.html_url }}"
+          RELEASE_TAG: ${{ steps.get_release_b.outputs.tag }}
         run: |
-          REPO_NAME_ONLY=${UPSTREAM_REPO#*/}
-          NOTES_WITH_REPO_NAME="${NOTES_TEMPLATE//'{{RepositoryName}}'/$REPO_NAME_ONLY}"
-          FINAL_NOTES="${NOTES_WITH_REPO_NAME//'{{URL}}'/$RELEASE_URL}"
+          RELEASE_TAG="v${RELEASE_TAG#v}" # Ensure the tag starts with 'v'
 
-          gh release create "$RELEASE_TAG" \
-            --notes "$FINAL_NOTES"
+          echo "Creating tag: $RELEASE_TAG"
+          git tag "$RELEASE_TAG"
 
-          echo "Successfully created release with tag '$RELEASE_TAG'."
+          echo "Pushing tag to remote..."
+          git push origin "$RELEASE_TAG"
+
+          echo "Successfully created and pushed tag '$RELEASE_TAG'."
