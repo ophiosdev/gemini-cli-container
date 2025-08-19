@@ -50,12 +50,20 @@ jobs:
             echo "is_valid=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Generate GitHub App token
+        id: app_token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.WORKFLOW_APP_ID }}
+          private-key: ${{ secrets.WORKFLOW_APP_PRIVATE_KEY }}
+
       - name: Checkout repository code
         # We need to check out the code to be able to check for existing tags and push new ones.
         if: steps.validate_tag.outputs.is_valid == 'true'
         uses: actions/checkout@v4
         with:
           fetch-tags: true
+          token: ${{ steps.app_token.outputs.token }}
 
       - name: Check if tag already exists locally
         id: check_tag
