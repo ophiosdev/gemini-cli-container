@@ -1,0 +1,73 @@
+name: Check Missing Container Images
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'
+
+jobs:
+  check-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: List version tags
+        id: list_tags
+        run: |
+          {
+            tags=$(git tag | grep '^v' | sort -r)
+            echo "tags<<EOF"
+            echo "$tags"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check GHCR for existing images
+        id: check_images
+        env:
+          TOKEN: ${{ secrets.GHCR_READ_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          missing_tags=()
+          # Use GitHub REST API to list container image versions (tags)
+          ghcr_tags=$(curl -sSL \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              -H "Authorization: Bearer ${TOKEN}" \
+              https://api.github.com/orgs/ophiosdev/packages/container/codex-cli/versions \
+            | jq -r '.[].metadata.container.tags[]?' 2>/dev/null || true)
+
+          echo "Existing GHCR tags: $ghcr_tags"
+
+          while IFS= read -r tag; do
+            if ! grep -qx "${tag#v}" <<< "$ghcr_tags"; then
+              echo "Image missing for $tag"
+              missing_tags+=("$tag")
+            fi
+          done <<< "${{ steps.list_tags.outputs.tags }}"
+
+          # Output missing tags correctly to GITHUB_OUTPUT
+          {
+            echo "missing_tags<<EOF"
+            printf "%s\n" "${missing_tags[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Generate GitHub App token
+        id: app_token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.WORKFLOW_APP_ID }}
+          private-key: ${{ secrets.WORKFLOW_APP_PRIVATE_KEY }}
+
+      - name: Trigger build-and-deploy for missing tags
+        if: steps.check_images.outputs.missing_tags != ''
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+        run: |
+          while read -r tag; do
+            echo "Triggering build-and-deploy for $tag"
+            gh workflow run build-and-deploy.yml --ref "$tag"
+          done <<< "${{ steps.check_images.outputs.missing_tags }}"
