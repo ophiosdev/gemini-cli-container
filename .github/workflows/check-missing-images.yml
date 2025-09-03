@@ -29,8 +29,12 @@ jobs:
         id: check_images
         env:
           TOKEN: ${{ secrets.GHCR_READ_TOKEN || secrets.GITHUB_TOKEN }}
+          SKIP_TAGS: ${{ vars.SKIP_TAGS }}
         run: |
           missing_tags=()
+          skipped_count=0
+          total_tags=0
+
           # Use GitHub REST API to list container image versions (tags)
           ghcr_tags=$(curl -sSL \
               -H "Accept: application/vnd.github+json" \
@@ -39,16 +43,37 @@ jobs:
               https://api.github.com/orgs/ophiosdev/packages/container/gemini-cli/versions \
             | jq -r '.[].metadata.container.tags[]?' 2>/dev/null || true)
 
-          echo "Existing GHCR tags: $ghcr_tags"
+          echo "📦 Existing GHCR tags:"
+          echo "$ghcr_tags"
+
+          # Combine multiline skip patterns into single regex
+          skip_regex=""
+          if [[ -n "${SKIP_TAGS:-}" ]]; then
+            skip_regex=$(echo "$SKIP_TAGS" | tr -s '\r\n' '|' | sed 's/|$//')
+            echo "🚫 Skip regex: $skip_regex"
+          else
+            echo "ℹ️ No skip patterns defined."
+          fi
 
           while IFS= read -r tag; do
+            ((total_tags++))
+            if [[ -n "$skip_regex" && "$tag" =~ $skip_regex ]]; then
+              echo "➡️ Skipping $tag (matches skip pattern)"
+              ((skipped_count++))
+              continue
+            fi
             if ! grep -qx "${tag#v}" <<< "$ghcr_tags"; then
-              echo "Image missing for $tag"
+              echo "❌ Image missing for $tag"
               missing_tags+=("$tag")
             fi
           done <<< "${{ steps.list_tags.outputs.tags }}"
 
-          # Output missing tags correctly to GITHUB_OUTPUT
+          echo "===== Summary ====="
+          echo " Total tags checked:   $total_tags"
+          echo " Skipped tags:         $skipped_count"
+          echo " Missing images found: ${#missing_tags[@]}"
+
+          # Output missing tags for next step
           {
             echo "missing_tags<<EOF"
             printf "%s\n" "${missing_tags[@]}"
