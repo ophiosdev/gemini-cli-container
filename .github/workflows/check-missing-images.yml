@@ -6,7 +6,7 @@ on:
     - cron: '0 6 * * *'
 
 jobs:
-  check-and-build:
+  check-missing-images:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -30,6 +30,8 @@ jobs:
         env:
           TOKEN: ${{ secrets.GHCR_READ_TOKEN || secrets.GITHUB_TOKEN }}
           SKIP_TAGS: ${{ vars.SKIP_TAGS }}
+          GHCR_ORG: ${{ vars.GHCR_ORG || github.repository_owner }}
+          GHCR_CONTAINER: ${{ vars.GHCR_CONTAINER }}
         run: |
           missing_tags=()
 
@@ -38,7 +40,7 @@ jobs:
               -H "Accept: application/vnd.github+json" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
               -H "Authorization: Bearer ${TOKEN}" \
-              https://api.github.com/orgs/ophiosdev/packages/container/gemini-cli/versions \
+              "https://api.github.com/orgs/${GHCR_ORG}/packages/container/${GHCR_CONTAINER}/versions" \
             | jq -r '.[].metadata.container.tags[]?' 2>/dev/null || true)
 
           echo "📦 Existing GHCR tags:"
