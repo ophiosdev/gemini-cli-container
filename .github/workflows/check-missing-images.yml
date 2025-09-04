@@ -32,8 +32,6 @@ jobs:
           SKIP_TAGS: ${{ vars.SKIP_TAGS }}
         run: |
           missing_tags=()
-          skipped_count=0
-          total_tags=0
 
           # Use GitHub REST API to list container image versions (tags)
           ghcr_tags=$(curl -sSL \
@@ -55,11 +53,14 @@ jobs:
             echo "ℹ️ No skip patterns defined."
           fi
 
+          declare -i skipped_count=0
+          declare -i total_tags=0
+
           while IFS= read -r tag; do
-            ((total_tags++))
+            total_tags+=1
             if [[ -n "$skip_regex" && "$tag" =~ $skip_regex ]]; then
               echo "➡️ Skipping $tag (matches skip pattern)"
-              ((skipped_count++))
+              skipped_count+=1
               continue
             fi
             if ! grep -qx "${tag#v}" <<< "$ghcr_tags" >/dev/null 2>&1; then
