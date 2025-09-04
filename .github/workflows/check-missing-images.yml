@@ -94,8 +94,9 @@ jobs:
         if: steps.check_images.outputs.missing_tags != ''
         env:
           GH_TOKEN: ${{ steps.app_token.outputs.token }}
+          WORKFLOW: ${{ vars.BUILD_WORKFLOW || 'build-and-deploy.yml' }}
         run: |
           while read -r tag; do
             echo "Triggering build-and-deploy for $tag"
-            gh workflow run build-and-deploy.yml --ref "$tag"
+            gh workflow run "${BUILD_WORKFLOW}" --ref "$tag"
           done <<< "${{ steps.check_images.outputs.missing_tags }}"
