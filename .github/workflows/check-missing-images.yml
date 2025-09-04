@@ -62,7 +62,7 @@ jobs:
               ((skipped_count++))
               continue
             fi
-            if ! grep -qx "${tag#v}" <<< "$ghcr_tags"; then
+            if ! grep -qx "${tag#v}" <<< "$ghcr_tags" >/dev/null 2>&1; then
               echo "❌ Image missing for $tag"
               missing_tags+=("$tag")
             fi
