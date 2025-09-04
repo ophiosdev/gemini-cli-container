@@ -17,11 +17,19 @@ jobs:
 
       - name: List version tags
         id: list_tags
+        env:
+          VERSION_PREFIX: ${{ vars.VERSION_PREFIX || 'v' }}
         run: |
+          if [[ -n "${VERSION_PREFIX}" ]]; then
+            tags=$(git tag | grep "^${VERSION_PREFIX}" | sort -r)
+          else
+            tags=$(git tag | sort -r)
+          fi
+
+          # Output tags for next step
           {
-            tags=$(git tag | grep '^v' | sort -r)
             echo "tags<<EOF"
-            echo "$tags"
+            printf "%s\n" "${tags}"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
