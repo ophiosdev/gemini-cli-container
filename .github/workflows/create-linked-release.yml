@@ -19,12 +19,12 @@ jobs:
     steps:
       - name: Get latest stable release from public upstream repo
         id: get_release_b
-        uses: pozetroninc/github-action-get-latest-release@master
+        uses: ophiosdev/github-action-latest-release@master
         with:
           # Reads the UPSTREAM_REPO variable from your repository settings.
           # This variable is REQUIRED for the workflow to function.
           repository: ${{ vars.UPSTREAM_REPO }}
-          excludes: prerelease, draft
+          includes: ^v?[0-9]+(\.[0-9]+)*$
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Validate Release Tag Format
