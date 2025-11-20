@@ -60,7 +60,7 @@ jobs:
       - name: Checkout repository code
         # We need to check out the code to be able to check for existing tags and push new ones.
         if: steps.validate_tag.outputs.is_valid == 'true'
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           fetch-tags: true
