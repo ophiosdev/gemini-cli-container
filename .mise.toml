@@ -1,0 +1,33 @@
+[settings]
+idiomatic_version_file_enable_tools = ["python"]
+
+[tools]
+"github:j178/prek" = "latest"
+
+[env]
+_.python.venv = { path = ".venv", create = true }
+
+[hooks]
+enter = "mise install && mise run setup"
+
+[tasks.setup]
+description = "Initialize the repository"
+depends = ["install-hooks"]
+outputs = [".venv/.gitignore"]
+silent = true
+run = """
+if [ ! -f .venv/.gitignore ]; then
+  echo '*' > .venv/.gitignore
+fi
+"""
+
+[tasks.install-hooks]
+description = "Setup git hooks using prek"
+silent = true
+sources = [".pre-commit-config.yaml"]
+outputs = [".git/prek-hooks-configured"]
+run = """
+if test -f .pre-commit-config.yaml && test -d .git; then
+  prek install && touch .git/prek-hooks-configured
+fi
+"""
