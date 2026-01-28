@@ -45,6 +45,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN npm install -g "@google/gemini-cli@${GEMINI_CLI_VERSION}"
 
 USER ${USERNAME}
+
+RUN GOBREW_ROOT="/home/${USERNAME}" \
+    curl -sL https://raw.githubusercontent.com/kevincobain2000/gobrew/master/git.io.sh | bash \
+    && chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}/.gobrew
+
+ENV PATH="/home/${USERNAME}/.gobrew/current/bin:/home/${USERNAME}/.gobrew/bin:$PATH"
+ENV GOPATH="/home/${USERNAME}/.gobrew/current/go"
+
 WORKDIR /work
 
 ENTRYPOINT ["gemini"]
