@@ -25,7 +25,7 @@ jobs:
 
       - name: Validate Semver
         id: semver
-        uses: matt-usurp/validate-semver@v2
+        uses: matt-usurp/validate-semver@v3.0.0
         with:
           version: ${{ steps.get_version.outputs.VERSION }}
 
