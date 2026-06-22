@@ -18,4 +18,4 @@ jobs:
 
       - name: Run pre-commit checks
         id: pre-commit
-        uses: cloudposse/github-action-pre-commit@v4.0.0
+        uses: cloudposse/github-action-pre-commit@v4.1.0
